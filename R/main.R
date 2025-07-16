@@ -287,6 +287,7 @@ run_UCell_pipline <-
     for (i in names(markers)) {
       pathway <- c(pathway, colnames(metadata)[grep(i, colnames(metadata))])
     }
+    pathway <- unique(pathway)
     meta.merge <- Seurat::FetchData(rds1, vars = pathway)
     colnames(meta.merge) <- gsub("_UCell", "", colnames(meta.merge))
     rds <- Seurat::AddMetaData(rds, as.data.frame(meta.merge))
