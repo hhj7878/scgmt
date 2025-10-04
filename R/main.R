@@ -190,10 +190,7 @@ run_AUCell_pipline <-
 #' @examples
 #'
 #'
-library(Seurat)
-library(GSVA)
-library(GSEABase)
-library(BiocParallel)
+
 
 run_GSVA_pipeline <- function(
   rds,
@@ -205,6 +202,10 @@ run_GSVA_pipeline <- function(
   BPPARAM = NULL,
   ncores = 1
 ) {
+  library(Seurat)
+  library(GSVA)
+  library(GSEABase)
+  library(BiocParallel)
   if (is.null(assay)) assay <- Seurat::DefaultAssay(rds)
   
   # 获取表达矩阵
@@ -1428,4 +1429,5 @@ scgmt_hierarchy_plot <-
       )
     return(p)
   }
+
 
