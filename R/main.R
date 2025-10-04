@@ -192,7 +192,7 @@ run_AUCell_pipline <-
 #'
 
 
-run_GSVA_pipeline <- function(
+run_GSVA_pipline <- function(
   rds,
   signatures,        # gmt 文件路径
   method = "ssgsea", # "ssgsea" 或 "gsva"
@@ -1429,6 +1429,7 @@ scgmt_hierarchy_plot <-
       )
     return(p)
   }
+
 
 
 
