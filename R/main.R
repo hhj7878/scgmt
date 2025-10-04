@@ -190,59 +190,54 @@ run_AUCell_pipline <-
 #' @examples
 #'
 #'
+library(Seurat)
+library(GSVA)
+library(GSEABase)
+library(BiocParallel)
 
-run_GSVA_pipline <-
-  function(rds,
-           signatures,
-           method = "ssgsea",
-           chunk.size = 1000,
-           assay = NULL,
-           slot = "counts",
-           kcdf = "Poisson",
-           BPPARAM = NULL,
-           ncores = 1) {
-    if (is.null(assay)) {
-      assay <- Seurat::DefaultAssay(rds)
+run_GSVA_pipeline <- function(
+  rds,
+  signatures,        # gmt 文件路径
+  method = "ssgsea", # "ssgsea" 或 "gsva"
+  assay = NULL,
+  slot = "counts",
+  kcdf = "Poisson",
+  BPPARAM = NULL,
+  ncores = 1
+) {
+  if (is.null(assay)) assay <- Seurat::DefaultAssay(rds)
+  
+  # 获取表达矩阵
+  expr_mat <- Seurat::GetAssayData(rds, assay = assay, slot = slot)
+  
+  # 支持多线程
+  if (is.null(BPPARAM)) BPPARAM <- MulticoreParam(workers = ncores)
+  
+  # 读取基因集
+  geneSets <- getGmt(signatures)
+  
+  # 直接计算 GSVA/ssGSEA
+  gsva_res <- bplapply(
+    X = list(expr_mat), # 这里不拆分，直接整体计算
+    BPPARAM = BPPARAM,
+    FUN = function(mat) {
+      set.seed(123)
+      gsva_es <- gsva(
+        as.matrix(mat),
+        geneSets,
+        method = method,
+        kcdf = kcdf,
+        verbose = FALSE
+      )
+      data.frame(t(gsva_es))
     }
-
-    matrix <- Seurat::GetAssayData(object = rds,
-                                   slot = slot,
-                                   assay = assay)
-
-    scaled_counts_list <-
-      split_data.matrix(matrix, chunk.size = chunk.size)
-
-    if (is.null(BPPARAM)) {
-      BPPARAM <- BiocParallel::MulticoreParam(workers = ncores)
-    }
-
-    geneSets <- GSEABase::getGmt(signatures)
-
-    meta.list <- BiocParallel::bplapply(
-      X = scaled_counts_list,
-      BPPARAM =  BPPARAM,
-      FUN = function(x) {
-        set.seed(123)
-        gsva_es <-
-          GSVA::gsva(
-            as.matrix(x),
-            geneSets,
-            method = c(method),
-            tau = switch(method, gsva = 1, ssgsea = 0.25, NA),
-            kcdf = kcdf,
-            parallel.sz = ncores
-          ) #
-        signature_exp <- data.frame(t(gsva_es))
-        return(list(signature_exp = signature_exp))
-      }
-    )
-    meta.merge <-
-      lapply(meta.list, function(x)
-        cbind(x[["signature_exp"]]))
-    meta.merge <- Reduce(rbind, meta.merge)
-    rds <- Seurat::AddMetaData(rds, as.data.frame(meta.merge))
-    return(rds)
-  }
+  )[[1]]
+  
+  # 添加到 Seurat 元数据
+  rds <- AddMetaData(rds, gsva_res)
+  return(rds)
+}
+ 
 
 #' run_UCell_pipline
 #'
@@ -1433,3 +1428,4 @@ scgmt_hierarchy_plot <-
       )
     return(p)
   }
+
