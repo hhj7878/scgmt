@@ -203,42 +203,42 @@ run_GSVA_pipeline <- function(
   ncores = 1
 ) {
   library(Seurat)
-  library(GSVA)
-  library(GSEABase)
-  library(BiocParallel)
+library(GSVA)
+library(GSEABase)
+library(BiocParallel)
+  
   if (is.null(assay)) assay <- Seurat::DefaultAssay(rds)
   
   # 获取表达矩阵
   expr_mat <- Seurat::GetAssayData(rds, assay = assay, slot = slot)
   
-  # 支持多线程
-  if (is.null(BPPARAM)) BPPARAM <- MulticoreParam(workers = ncores)
-  
   # 读取基因集
   geneSets <- getGmt(signatures)
   
-  # 直接计算 GSVA/ssGSEA
-  gsva_res <- bplapply(
-    X = list(expr_mat), # 这里不拆分，直接整体计算
-    BPPARAM = BPPARAM,
-    FUN = function(mat) {
-      set.seed(123)
-      gsva_es <- gsva(
-        as.matrix(mat),
-        geneSets,
-        method = method,
-        kcdf = kcdf,
-        verbose = FALSE
-      )
-      data.frame(t(gsva_es))
-    }
-  )[[1]]
+  # 创建 GSVA 参数对象（新版 GSVA 推荐方式）
+  params <- gsvaParam(
+    expr = as.matrix(expr_mat),
+    gset.idx.list = geneSets,
+    min.sz = 1,
+    max.sz = Inf,
+    method = method,
+    kcdf = kcdf,
+    tau = ifelse(method == "ssgsea", 1, 0),
+    abs.ranking = FALSE,
+    max.diff = TRUE
+  )
   
-  # 添加到 Seurat 元数据
-  rds <- AddMetaData(rds, gsva_res)
+  # 多线程
+  if (is.null(BPPARAM)) BPPARAM <- MulticoreParam(workers = ncores)
+  
+  # 执行 GSVA
+  gsva_res <- gsva(params, BPPARAM = BPPARAM, verbose = TRUE)
+  
+  # 转置并添加到 Seurat 元数据
+  rds <- AddMetaData(rds, data.frame(t(gsva_res)))
+  
   return(rds)
 }
- 
 
 #' run_UCell_pipline
 #'
@@ -1429,5 +1429,6 @@ scgmt_hierarchy_plot <-
       )
     return(p)
   }
+
 
 
